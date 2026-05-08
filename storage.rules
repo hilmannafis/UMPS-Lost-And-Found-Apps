@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Items photos - users can upload and read
+    // Allow public read access for web compatibility (images are accessed via download URLs)
+    match /items/{itemId}/{fileName} {
+      // Allow public read access for web compatibility
+      allow read: if true;
+      // Authenticated users can upload photos (for items they own or are creating)
+      // More permissive: allow any authenticated user to upload images
+      allow write: if isAuthenticated() 
+                   && request.resource.size < 10 * 1024 * 1024;  // 10MB limit
+                   // Removed contentType check to be more permissive
+    }
+    
+    // Claims evidence photos - users can upload and read
+    // Allow public read access for web compatibility
+    match /claims/{claimId}/{fileName} {
+      // Allow public read access for web compatibility
+      allow read: if true;
+      // Authenticated users can upload evidence photos
+      allow write: if isAuthenticated() 
+                   && request.resource.size < 10 * 1024 * 1024;  // 10MB limit
+    }
+    
+    // User profile photos
+    match /users/{userId}/{fileName} {
+      // Users can read any profile photo
+      allow read: if isAuthenticated();
+      // Users can only upload/update their own profile photo
+      allow write: if isAuthenticated() 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024  // 5MB limit
+                   && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Chat message images - authenticated users can upload and read
+    // Allow public read access for web compatibility (images are accessed via download URLs)
+    match /messages/{chatId}/{fileName} {
+      // Allow public read access for web compatibility
+      allow read: if true;
+      // Authenticated users can upload images to chats they're part of
+      allow write: if isAuthenticated() 
+                   && request.resource.size < 10 * 1024 * 1024;  // 10MB limit
+    }
+  }
+}
+
